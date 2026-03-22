@@ -14,7 +14,8 @@ export function SocketProvider({ children, token }) {
   useEffect(() => {
     if (!token) return
 
-    const SOCKET_URL = import.meta.env.DEV ? undefined : 'http://192.168.1.5:3001'
+    const isCapacitor = typeof window !== 'undefined' && !!window.Capacitor;
+    const SOCKET_URL = isCapacitor ? 'http://192.168.1.5:3001' : undefined;
     const newSocket = io(SOCKET_URL, {
       auth: { token }
     })

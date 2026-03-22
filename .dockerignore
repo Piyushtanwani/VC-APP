@@ -1,0 +1,12 @@
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+frontend/dist/
+android/
+.git/
+.env
+backend/app.db
+backend/app.db-shm
+backend/app.db-wal
+*.log
+sdk.zip

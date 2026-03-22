@@ -1,4 +1,5 @@
-const API_BASE = import.meta.env.DEV ? '' : 'http://192.168.1.5:3001';
+const isCapacitor = typeof window !== 'undefined' && !!window.Capacitor;
+const API_BASE = isCapacitor ? 'http://192.168.1.5:3001' : (import.meta.env.DEV ? '' : '');
 
 async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('token');
