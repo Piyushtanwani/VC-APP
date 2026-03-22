@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ConnectFlow</string>
+    <string name="title_activity_main">ConnectFlow</string>
+    <string name="package_name">io.connectflow.app</string>
+    <string name="custom_url_scheme">io.connectflow.app</string>
+</resources>

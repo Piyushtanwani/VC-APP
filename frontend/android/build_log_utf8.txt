@@ -1,0 +1,415 @@
+﻿To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :capacitor-android:preBuild UP-TO-DATE
+> Task :capacitor-android:preDebugBuild UP-TO-DATE
+> Task :capacitor-android:writeDebugAarMetadata UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:preBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:preDebugBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :capacitor-android:generateDebugResValues UP-TO-DATE
+> Task :capacitor-android:generateDebugResources UP-TO-DATE
+> Task :capacitor-android:packageDebugResources UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:generateDebugResValues UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:generateDebugResources UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:packageDebugResources UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :capacitor-android:extractDeepLinksDebug UP-TO-DATE
+> Task :capacitor-android:processDebugManifest UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:extractDeepLinksDebug UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:processDebugManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :capacitor-android:compileDebugLibraryResources UP-TO-DATE
+> Task :capacitor-android:parseDebugLocalResources UP-TO-DATE
+> Task :capacitor-android:generateDebugRFile UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:compileDebugLibraryResources UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:parseDebugLocalResources UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:generateDebugRFile UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :capacitor-android:javaPreCompileDebug UP-TO-DATE
+
+> Task :capacitor-android:compileDebugJavaWithJavac
+.\gradlew : Note: Some 
+input files use 
+unchecked or unsafe 
+operations.
+At line:1 char:1
++ .\gradlew 
+assembleDebug 
+--no-daemon > 
+build_log.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Note: Some in   
+ pu...afe operation    
+s.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Note: Recompile with 
+-Xlint:unchecked for 
+details.
+
+> Task :capacitor-android:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:javaPreCompileDebug UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:compileDebugJavaWithJavac NO-SOURCE
+> Task :capacitor-cordova-android-plugins:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :capacitor-android:mergeDebugShaders UP-TO-DATE
+> Task :capacitor-android:compileDebugShaders NO-SOURCE
+> Task :capacitor-android:generateDebugAssets UP-TO-DATE
+> Task :capacitor-android:packageDebugAssets UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeDebugShaders UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:compileDebugShaders NO-SOURCE
+> Task :capacitor-cordova-android-plugins:generateDebugAssets UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:packageDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :capacitor-android:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugJavaRes NO-SOURCE
+> Task :capacitor-android:processDebugJavaRes NO-SOURCE
+> Task :capacitor-cordova-android-plugins:processDebugJavaRes NO-SOURCE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :capacitor-android:mergeDebugJniLibFolders UP-TO-DATE
+> Task :capacitor-android:mergeDebugNativeLibs NO-SOURCE
+> Task :capacitor-android:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeDebugJniLibFolders UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeDebugNativeLibs NO-SOURCE
+> Task :capacitor-cordova-android-plugins:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses FAILED
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+[Incubating] Problems report is available at: file:///D:/VC%20APP/frontend/android/build/reports/problems/problems-report.html
+
+FAILURE: Build failed 
+with an exception.
+
+* What went wrong:
+Execution failed for 
+task ':app:checkDebugDu
+plicateClasses'.
+> A failure occurred 
+while executing com.and
+roid.build.gradle.inter
+nal.tasks.CheckDuplicat
+esRunnable
+   > Duplicate class ko
+tlin.collections.jdk8.C
+ollectionsJDK8Kt found 
+in modules kotlin-stdli
+b-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.internal.jdk7.JDK7
+PlatformImplementations
+ found in modules kotli
+n-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.internal.jdk7.JDK7
+PlatformImplementations
+$ReflectSdkVersion 
+found in modules kotlin
+-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.internal.jdk8.JDK8
+PlatformImplementations
+ found in modules kotli
+n-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.internal.jdk8.JDK8
+PlatformImplementations
+$ReflectSdkVersion 
+found in modules kotlin
+-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.io.path.Experiment
+alPathApi found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.io.path.PathRelati
+vizer found in modules 
+kotlin-stdlib-1.8.22.ja
+r -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class 
+kotlin.io.path.PathsKt 
+found in modules kotlin
+-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.io.path.PathsKt__P
+athReadWriteKt found 
+in modules kotlin-stdli
+b-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.io.path.PathsKt__P
+athUtilsKt found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.jdk7.AutoCloseable
+Kt found in modules kot
+lin-stdlib-1.8.22.jar 
+-> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk7-1.6.
+21.jar -> kotlin-stdlib
+-jdk7-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk7:1.6.21)
+     Duplicate class ko
+tlin.jvm.jdk8.JvmRepeat
+ableKt found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.random.jdk8.Platfo
+rmThreadLocalRandom 
+found in modules kotlin
+-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.streams.jdk8.Strea
+msKt found in modules k
+otlin-stdlib-1.8.22.jar
+ -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.streams.jdk8.Strea
+msKt$asSequence$$inline
+d$Sequence$1 found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.streams.jdk8.Strea
+msKt$asSequence$$inline
+d$Sequence$2 found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.streams.jdk8.Strea
+msKt$asSequence$$inline
+d$Sequence$3 found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.streams.jdk8.Strea
+msKt$asSequence$$inline
+d$Sequence$4 found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.text.jdk8.RegexExt
+ensionsJDK8Kt found in 
+modules kotlin-stdlib-1
+.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     Duplicate class ko
+tlin.time.jdk8.Duration
+ConversionsJDK8Kt 
+found in modules kotlin
+-stdlib-1.8.22.jar -> 
+kotlin-stdlib-1.8.22 (o
+rg.jetbrains.kotlin:kot
+lin-stdlib:1.8.22) and 
+kotlin-stdlib-jdk8-1.6.
+21.jar -> kotlin-stdlib
+-jdk8-1.6.21 (org.jetbr
+ains.kotlin:kotlin-stdl
+ib-jdk8:1.6.21)
+     
+     Go to the 
+documentation to learn 
+how to <a href="d.andro
+id.com/r/tools/classpat
+h-sync-errors">Fix 
+dependency resolution 
+errors</a>.
+
+* Try:
+> Run with 
+--stacktrace option to 
+get the stack trace.
+> Run with --info or 
+--debug option to get 
+more log output.
+> Run with --scan to 
+get full insights.
+> Get more help at http
+s://help.gradle.org.
+
+BUILD FAILED in 39s
+57 actionable tasks: 4 executed, 53 up-to-date
