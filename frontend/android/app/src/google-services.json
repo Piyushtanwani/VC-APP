@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "573307135333",
+    "project_id": "connectflow-7e64a",
+    "storage_bucket": "connectflow-7e64a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:573307135333:android:792bf807fc678ef111ad8c",
+        "android_client_info": {
+          "package_name": "io.connectflow.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDl6zydVam2Kj5llJ_VD1dnbR76THm3DU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

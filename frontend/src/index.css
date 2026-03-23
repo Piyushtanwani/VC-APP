@@ -341,6 +341,32 @@ body {
   color: var(--text-muted);
 }
 
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  font-size: 1.1rem;
+  z-index: 1;
+}
+
+.password-toggle:hover {
+  color: var(--text-primary);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

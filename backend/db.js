@@ -14,6 +14,7 @@ db.exec(`
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    fcm_token TEXT,
     online_status INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
   );
@@ -70,6 +71,27 @@ db.exec(`
     FOREIGN KEY (caller_id) REFERENCES users(id),
     FOREIGN KEY (receiver_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS otp_verifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    code TEXT NOT NULL,
+    purpose TEXT NOT NULL CHECK(purpose IN ('registration', 'password_reset')),
+    expires_at DATETIME NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
+
+// Automated Migration: Add fcm_token column if missing
+try {
+  const tableInfo = db.prepare('PRAGMA table_info(users)').all();
+  const hasFcmToken = tableInfo.some(col => col.name === 'fcm_token');
+  if (!hasFcmToken) {
+    db.prepare('ALTER TABLE users ADD COLUMN fcm_token TEXT').run();
+    console.log('✅ Added fcm_token column to users table');
+  }
+} catch (err) {
+  console.error('Migration error:', err.message);
+}
 
 module.exports = db;

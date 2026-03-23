@@ -10,22 +10,24 @@ RUN npm run build
 FROM node:20
 WORKDIR /app
 
-# Install backend dependencies
+# Install backend dependencies first to leverage Docker layer caching
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
 RUN npm install --legacy-peer-deps --production
 
-# Copy backend source
+# Copy backend source code
 COPY backend/ ./
 
-# Copy compiled frontend from Stage 1 into the proper relative structure
+# Copy compiled frontend from Stage 1
+# We place it in /app/frontend/dist so the backend can serve it from ../frontend/dist
 WORKDIR /app
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Expose port and start server
+# Expose the application port
 WORKDIR /app/backend
 ENV NODE_ENV=production
 ENV PORT=3001
 EXPOSE 3001
 
+# Start the server
 CMD ["node", "server.js"]

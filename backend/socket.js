@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('./db');
+const { sendPushNotification } = require('./utils/fcm');
 
 // Map userId -> socketId
 const onlineUsers = new Map();
@@ -46,12 +47,21 @@ function setupSocket(io) {
 
     // ===== FRIEND REQUEST EVENTS =====
     socket.on('send_friend_request', (data) => {
-      const receiverSocketId = onlineUsers.get(data.receiverId);
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('friend_request_received', {
           from: { id: userId, username },
           requestId: data.requestId
         });
+      } else {
+        // Send push notification if receiver is offline
+        const receiver = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(data.receiverId);
+        if (receiver && receiver.fcm_token) {
+          sendPushNotification(receiver.fcm_token, {
+            title: 'New Friend Request',
+            body: `${username} sent you a friend request!`,
+            data: { type: 'friend_request', senderId: userId.toString() }
+          });
+        }
       }
     });
 
@@ -99,6 +109,16 @@ function setupSocket(io) {
       const receiverSocketId = onlineUsers.get(receiverId);
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('receive_message', msgData);
+      } else {
+        // Send push notification if offline
+        const receiver = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(receiverId);
+        if (receiver && receiver.fcm_token) {
+          sendPushNotification(receiver.fcm_token, {
+            title: `New message from ${username}`,
+            body: message.length > 50 ? message.substring(0, 47) + '...' : message,
+            data: { type: 'chat_message', senderId: userId.toString() }
+          });
+        }
       }
 
       // Confirm to sender
@@ -154,6 +174,16 @@ function setupSocket(io) {
         from: { id: userId, username },
         signal: data.signal
       });
+
+      // Also send push notification (always for calls, in case app is minimized)
+      const receiver = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(targetId);
+      if (receiver && receiver.fcm_token) {
+        sendPushNotification(receiver.fcm_token, {
+          title: 'Incoming Video Call',
+          body: `${username} is calling you...`,
+          data: { type: 'video_call', callerId: userId.toString() }
+        });
+      }
     });
 
     socket.on('accept_call', (data) => {

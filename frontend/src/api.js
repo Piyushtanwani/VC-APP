@@ -1,5 +1,7 @@
-const isCapacitor = typeof window !== 'undefined' && !!window.Capacitor;
-const API_BASE = isCapacitor ? 'http://192.168.1.5:3001' : (import.meta.env.DEV ? '' : '');
+import { Capacitor } from '@capacitor/core';
+
+const isNative = Capacitor.isNativePlatform();
+const API_BASE = 'https://vc-app-ibdu.onrender.com';
 
 async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('token');
@@ -31,8 +33,17 @@ async function apiFetch(endpoint, options = {}) {
 
 export const api = {
   // Auth
-  register: (username, email, password) =>
-    apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }),
+  register: (username, email, password, otpCode) =>
+    apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ username, email, password, otpCode }) }),
+
+  sendOtp: (email, purpose, username) =>
+    apiFetch('/auth/send-otp', { method: 'POST', body: JSON.stringify({ email, purpose, username }) }),
+
+  forgotPassword: (email) =>
+    apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+
+  resetPassword: (email, otpCode, newPassword) =>
+    apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, otpCode, newPassword }) }),
 
   login: (username, password) =>
     apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
@@ -59,4 +70,6 @@ export const api = {
   // Messages
   getMessages: (friendId) => apiFetch(`/messages/${friendId}`),
   getCallHistory: () => apiFetch('/calls'),
+  updateFcmToken: (fcmToken) =>
+    apiFetch('/auth/fcm-token', { method: 'POST', body: JSON.stringify({ fcmToken }) }),
 };

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { io } from 'socket.io-client'
+import { Capacitor } from '@capacitor/core'
 
 const SocketContext = createContext(null)
 
@@ -14,8 +15,8 @@ export function SocketProvider({ children, token }) {
   useEffect(() => {
     if (!token) return
 
-    const isCapacitor = typeof window !== 'undefined' && !!window.Capacitor;
-    const SOCKET_URL = isCapacitor ? 'http://192.168.1.5:3001' : undefined;
+    const isNative = Capacitor.isNativePlatform();
+    const SOCKET_URL = 'https://vc-app-ibdu.onrender.com';
     const newSocket = io(SOCKET_URL, {
       auth: { token }
     })

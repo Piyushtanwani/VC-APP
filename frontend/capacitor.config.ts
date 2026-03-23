@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'ConnectFlow',
   webDir: 'dist',
   server: {
-    cleartext: true
+    androidScheme: 'https'
   }
 };
 

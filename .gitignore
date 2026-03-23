@@ -44,3 +44,8 @@ backend/key.pem
 sdk.zip
 hs_err_pid*.log
 replay_pid*.log
+
+# Firebase Secrets
+backend/fcm-service-account.json
+frontend/android/app/google-services.json
+frontend/android/app/src/google-services.json

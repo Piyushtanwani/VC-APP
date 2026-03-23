@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import { useSocket } from '../SocketContext'
 import { api } from '../api'
 import ChatView from './ChatView'
@@ -119,6 +121,28 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
         ...prev,
         [data.sender_id]: data.message
       }))
+
+      // Native Phone Notification
+      if (!selectedFriend || selectedFriend.id !== data.sender_id) {
+        if (Capacitor.isNativePlatform()) {
+          LocalNotifications.checkPermissions().then(permission => {
+            if (permission.display === 'granted') {
+              LocalNotifications.schedule({
+                notifications: [
+                  {
+                    title: `New message from ${data.sender_username}`,
+                    body: data.message.length > 50 ? data.message.substring(0, 50) + '...' : data.message,
+                    id: Date.now(),
+                    schedule: { at: new Date(Date.now() + 100) },
+                    sound: 'default',
+                    channelId: 'chat-messages'
+                  }
+                ]
+              })
+            }
+          })
+        }
+      }
 
       if (!selectedFriend || selectedFriend.id !== data.sender_id) {
         showToast(`💬 ${data.sender_username} says:`, data.message)
