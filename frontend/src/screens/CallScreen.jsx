@@ -81,7 +81,11 @@ export default function CallScreen({ call, currentUser, onEndCall }) {
           if (remoteVideoRef.current && event.streams[0]) {
             remoteVideoRef.current.srcObject = event.streams[0]
             // Explicitly call play to bypass some mobile browser autoplay policies
-            remoteVideoRef.current.play().catch(e => console.error("Audio autoplay prevented:", e))
+            remoteVideoRef.current.play().then(() => {
+              if (window.AudioToggle) {
+                window.AudioToggle.setAudioMode(window.AudioToggle.SPEAKER);
+              }
+            }).catch(e => console.error("Audio autoplay prevented:", e))
           }
           if (mounted) setCallStatus('connected')
         }
@@ -207,6 +211,9 @@ export default function CallScreen({ call, currentUser, onEndCall }) {
   }, [])
 
   const cleanup = () => {
+    if (window.AudioToggle) {
+      window.AudioToggle.setAudioMode(window.AudioToggle.NORMAL);
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop())
       localStreamRef.current = null
