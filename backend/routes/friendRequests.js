@@ -14,6 +14,11 @@ router.post('/send', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Cannot send request to yourself' });
     }
 
+    const receiverUser = db.prepare('SELECT id FROM users WHERE id = ?').get(receiverId);
+    if (!receiverUser) {
+      return res.status(404).json({ error: 'User does not exist' });
+    }
+
     // Check if already friends
     const friendship = db.prepare(`
       SELECT id FROM friends

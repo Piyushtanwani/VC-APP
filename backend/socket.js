@@ -47,6 +47,7 @@ function setupSocket(io) {
 
     // ===== FRIEND REQUEST EVENTS =====
     socket.on('send_friend_request', (data) => {
+      const receiverSocketId = onlineUsers.get(data.receiverId);
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('friend_request_received', {
           from: { id: userId, username },
