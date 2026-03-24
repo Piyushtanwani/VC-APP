@@ -17,7 +17,7 @@ export function SocketProvider({ children, token }) {
 
     const isNative = Capacitor.isNativePlatform();
     // Use relative path '' for web production, localhost for local web, and hardcoded URL for native app.
-    const SOCKET_URL = isNative ? 'https://YOUR_RENDER_URL_HERE.onrender.com' : (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+    const SOCKET_URL = isNative ? 'https://vc-app-ibdu.onrender.com' : (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
     const newSocket = io(SOCKET_URL, {
       auth: { token }
     })

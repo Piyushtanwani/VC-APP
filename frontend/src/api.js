@@ -2,7 +2,7 @@ import { Capacitor } from '@capacitor/core';
 
 const isNative = Capacitor.isNativePlatform();
 // Use relative path '' for web production, localhost for local web, and hardcoded URL for native app.
-const API_BASE = isNative ? 'https://YOUR_RENDER_URL_HERE.onrender.com' : (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
+const API_BASE = isNative ? 'https://vc-app-ibdu.onrender.com' : (window.location.hostname === 'localhost' ? 'http://localhost:3001' : '');
 
 async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem('token');

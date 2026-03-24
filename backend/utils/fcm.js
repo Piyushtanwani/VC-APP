@@ -3,7 +3,12 @@ const path = require('path');
 
 // Initialize Firebase Admin
 try {
-  const serviceAccount = require(path.join(__dirname, '..', 'fcm-service-account.json'));
+  let serviceAccount;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    serviceAccount = require(path.join(__dirname, '..', 'fcm-service-account.json'));
+  }
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
