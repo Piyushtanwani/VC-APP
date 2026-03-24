@@ -13,6 +13,8 @@ export default function Auth({ onLogin }) {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [usernames, setUsernames] = useState([])
+  const [selectedUsername, setSelectedUsername] = useState('')
 
   const handleSendOtp = async (e) => {
     e.preventDefault()
@@ -21,7 +23,23 @@ export default function Auth({ onLogin }) {
     setLoading(true)
     try {
       const purpose = isForgotPassword ? 'password_reset' : 'registration'
-      await api.sendOtp(email, purpose, username)
+      
+      if (isForgotPassword && !selectedUsername) {
+        const accounts = await api.getUsernamesByEmail(email)
+        if (accounts.length === 0) {
+          throw new Error('No accounts found with this email')
+        }
+        if (accounts.length === 1) {
+          setSelectedUsername(accounts[0])
+        } else {
+          setUsernames(accounts)
+          setMessage('Multiple accounts found. Please select one below.')
+          setLoading(false)
+          return
+        }
+      }
+
+      await api.sendOtp(email, purpose, isForgotPassword ? selectedUsername : username)
       setIsOtpSent(true)
       setMessage('OTP has been sent to your email.')
     } catch (err) {
@@ -47,7 +65,7 @@ export default function Auth({ onLogin }) {
           await handleSendOtp(e)
           return
         }
-        await api.resetPassword(email, otpCode, password)
+        await api.resetPassword(email, otpCode, password, selectedUsername)
         setMessage('Password reset successful. You can now login.')
         setIsForgotPassword(false)
         setIsLogin(true)
@@ -75,6 +93,8 @@ export default function Auth({ onLogin }) {
     setIsOtpSent(false)
     setOtpCode('')
     setPassword('')
+    setUsernames([])
+    setSelectedUsername('')
   }
 
   return (
@@ -104,7 +124,6 @@ export default function Auth({ onLogin }) {
               />
             </div>
           )}
-
           {(!isLogin || isForgotPassword) && (
             <div className="form-group">
               <label>Email</label>
@@ -115,8 +134,41 @@ export default function Auth({ onLogin }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isOtpSent}
+                disabled={isOtpSent || usernames.length > 0}
               />
+            </div>
+          )}
+
+          {isForgotPassword && usernames.length > 0 && !isOtpSent && (
+            <div className="form-group">
+              <label>Select Account</label>
+              <select 
+                className="form-input"
+                value={selectedUsername} 
+                onChange={(e) => setSelectedUsername(e.target.value)}
+                required
+                style={{ 
+                  width: '100%',
+                  padding: '14px 16px',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)',
+                  fontFamily: 'inherit',
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 16px center',
+                  backgroundSize: '16px'
+                }}
+              >
+                <option value="" disabled style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>Select which username to reset</option>
+                {usernames.map(u => (
+                  <option key={u} value={u} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{u}</option>
+                ))}
+              </select>
             </div>
           )}
 

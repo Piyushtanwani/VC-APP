@@ -12,7 +12,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
-    email TEXT UNIQUE NOT NULL,
+    email TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     fcm_token TEXT,
     online_status INTEGER DEFAULT 0,
@@ -89,6 +89,45 @@ try {
   if (!hasFcmToken) {
     db.prepare('ALTER TABLE users ADD COLUMN fcm_token TEXT').run();
     console.log('✅ Added fcm_token column to users table');
+  }
+
+  // Migration: Remove UNIQUE constraint from email if it exists
+  // We check the table schema by creating a dummy table and comparing
+  // Or more simply, just check if the UNIQUE constraint is there in the DDL
+  const schema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get().sql;
+  if (/email TEXT\s+UNIQUE/i.test(schema) || schema.includes('email TEXT UNIQUE')) {
+    console.log('🔄 Migrating users table to remove UNIQUE(email)...');
+    try {
+      db.pragma('foreign_keys = OFF');
+      db.transaction(() => {
+        // 1. Create new table
+        db.prepare(`
+          CREATE TABLE users_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            fcm_token TEXT,
+            online_status INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+          )
+        `).run();
+        
+        // 2. Copy data
+        db.prepare('INSERT INTO users_new SELECT * FROM users').run();
+        
+        // 3. Drop old table
+        db.prepare('DROP TABLE users').run();
+        
+        // 4. Rename new table
+        db.prepare('ALTER TABLE users_new RENAME TO users').run();
+      })();
+      db.pragma('foreign_keys = ON');
+      console.log('✅ Migration complete: UNIQUE(email) removed.');
+    } catch (err) {
+      db.pragma('foreign_keys = ON');
+      throw err;
+    }
   }
 } catch (err) {
   console.error('Migration error:', err.message);

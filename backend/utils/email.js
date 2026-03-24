@@ -37,6 +37,7 @@ async function sendOTP(email, code, purpose) {
     return true;
   } catch (err) {
     console.error('Email send error:', err);
+    if (err.response) console.error('SMTP Response:', err.response);
     return false;
   }
 }

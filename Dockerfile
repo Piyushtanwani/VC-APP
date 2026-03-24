@@ -23,11 +23,9 @@ COPY backend/ ./
 WORKDIR /app
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Expose the application port
+# Expose the application port (Render will inject its own PORT env var)
 WORKDIR /app/backend
 ENV NODE_ENV=production
-ENV PORT=3001
-EXPOSE 3001
 
 # Start the server
 CMD ["node", "server.js"]

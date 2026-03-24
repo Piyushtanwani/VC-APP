@@ -15,24 +15,21 @@ function generateOTP() {
 // Send OTP for Register
 router.post('/send-otp', async (req, res) => {
   try {
-    const { email, purpose } = req.body; // purpose: 'registration' or 'password_reset'
+    const { email, purpose, username } = req.body; // purpose: 'registration' or 'password_reset'
     if (!email || !purpose) {
       return res.status(400).json({ error: 'Email and purpose are required' });
     }
 
     // If purpose is registration, check if user exists
     if (purpose === 'registration') {
-      const { username } = req.body;
-      const existingEmail = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(email);
-      if (existingEmail) {
-        return res.status(409).json({ error: 'Email already exists' });
-      }
-      
+      // Only check for username existence, as multiple users can share an email
       if (username) {
-        const existingUser = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(username);
+        const existingUser = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)').get(username);
         if (existingUser) {
-          return res.status(409).json({ error: 'Username already exists' });
+          return res.status(400).json({ error: 'Username already exists' });
         }
+      } else {
+        return res.status(400).json({ error: 'Username is required for registration' });
       }
     }
 
@@ -87,22 +84,21 @@ router.post('/register', (req, res) => {
       return res.status(401).json({ error: 'OTP has expired' });
     }
 
-    // Check if user exists (double check case-insensitively)
-    const existingEmail = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(email);
-    if (existingEmail) {
-      return res.status(409).json({ error: 'Email already exists' });
-    }
-
-    const existingUser = db.prepare('SELECT id FROM users WHERE LOWER(username) = LOWER(?)').get(username);
+    // Check for existing username only
+    const existingUser = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)').get(username);
     if (existingUser) {
-      return res.status(409).json({ error: 'Username already exists' });
+      return res.status(400).json({ error: 'Username already exists' });
     }
 
     // Delete OTP after use
     db.prepare('DELETE FROM otp_verifications WHERE id = ?').run(otp.id);
 
     const password_hash = bcrypt.hashSync(password, 10);
-    const result = db.prepare('INSERT INTO users (username, email, password_hash, fcm_token) VALUES (?, ?, ?, ?)').run(username, email, password_hash, fcmToken || null);
+    const stmt = db.prepare(`
+      INSERT INTO users (username, email, password_hash, fcm_token) 
+      VALUES (?, ?, ?, ?)
+    `);
+    const result = stmt.run(username, email, password_hash, fcmToken || null);
 
     const token = jwt.sign({ id: result.lastInsertRowid, username }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
@@ -170,11 +166,9 @@ router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
 
-    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (!user) {
-      // Don't reveal if user exists for security, just say "If email exists..."
-      return res.json({ message: 'If an account exists with this email, an OTP has been sent.' });
-    }
+    // We don't check for user existence here to avoid revealing valid emails.
+    // The OTP will be sent if the email exists, and the user will need to provide
+    // the correct username during reset.
 
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -193,20 +187,27 @@ router.post('/forgot-password', async (req, res) => {
 // Reset Password
 router.post('/reset-password', (req, res) => {
   try {
-    const { email, otpCode, newPassword } = req.body;
-    if (!email || !otpCode || !newPassword) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
+    const { email, code, newPassword, username } = req.body;
+
+  if (!email || !code || !newPassword || !username) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
 
     const otp = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND code = ? AND purpose = ?')
-      .get(email, otpCode, 'password_reset');
+      .get(email, code, 'password_reset');
 
     if (!otp || new Date(otp.expires_at) < new Date()) {
       return res.status(401).json({ error: 'Invalid or expired OTP' });
     }
 
-    const password_hash = bcrypt.hashSync(newPassword, 10);
-    db.prepare('UPDATE users SET password_hash = ? WHERE email = ?').run(password_hash, email);
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    // Update specific user with that email and username
+    const result = db.prepare('UPDATE users SET password_hash = ? WHERE LOWER(email) = LOWER(?) AND LOWER(username) = LOWER(?)')
+      .run(hashedPassword, email, username);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'User not found with this email/username combination' });
+    }
     db.prepare('DELETE FROM otp_verifications WHERE id = ?').run(otp.id);
 
     res.json({ message: 'Password reset successful' });
@@ -216,6 +217,21 @@ router.post('/reset-password', (req, res) => {
 });
 
 // Update FCM Token
+// New: Find usernames associated with an email
+router.get('/accounts', (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required' });
+  }
+
+  try {
+    const users = db.prepare('SELECT username FROM users WHERE LOWER(email) = LOWER(?)').all(email);
+    res.json(users.map(u => u.username));
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.post('/fcm-token', authenticateToken, (req, res) => {
   try {
     const { fcmToken } = req.body;
