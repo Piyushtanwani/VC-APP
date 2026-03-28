@@ -32,6 +32,17 @@ export default function App() {
         const pushPerm = await PushNotifications.requestPermissions()
         if (pushPerm.receive === 'granted') {
           await PushNotifications.register()
+          
+          // Create WebRTC Call Channel for Android high-priority ringtones
+          await PushNotifications.createChannel({
+            id: 'calls',
+            name: 'Video Calls',
+            description: 'Incoming video call alerts',
+            importance: 5,
+            visibility: 1,
+            sound: 'ringtone',
+            vibration: true
+          })
         }
       } catch (err) {
         console.error('Error requesting notifications:', err)

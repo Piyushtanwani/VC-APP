@@ -23,7 +23,7 @@ try {
  * @param {string} token - FCM registration token
  * @param {object} payload - Notification payload { title, body, data }
  */
-async function sendPushNotification(token, payload) {
+async function sendPushNotification(token, payload, channelId = 'default') {
   if (!admin.apps.length) return false;
   if (!token) return false;
 
@@ -31,6 +31,13 @@ async function sendPushNotification(token, payload) {
     notification: {
       title: payload.title,
       body: payload.body,
+    },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: channelId,
+        sound: 'default'
+      }
     },
     data: payload.data || {},
     token: token

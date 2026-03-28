@@ -74,6 +74,16 @@ function setupSocket(io) {
             from: { id: userId, username }
           });
         }
+        
+        // Send push notification for accepted request
+        const sender = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(data.senderId);
+        if (sender && sender.fcm_token) {
+          sendPushNotification(sender.fcm_token, {
+            title: 'Friend Request Accepted',
+            body: `${username} accepted your friend request!`,
+            data: { type: 'friend_request_accepted', fromId: userId.toString() }
+          });
+        }
       }
     });
 
@@ -183,7 +193,7 @@ function setupSocket(io) {
           title: 'Incoming Video Call',
           body: `${username} is calling you...`,
           data: { type: 'video_call', callerId: userId.toString() }
-        });
+        }, 'calls');
       }
     });
 

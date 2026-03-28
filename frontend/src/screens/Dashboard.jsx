@@ -5,6 +5,7 @@ import { useSocket } from '../SocketContext'
 import { api } from '../api'
 import ChatView from './ChatView'
 import CallScreen from './CallScreen'
+import { App } from '@capacitor/app'
 
 export default function Dashboard({ user, setUser, token, onLogout }) {
   const { socket, notifications, addNotification } = useSocket()
@@ -24,6 +25,28 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
   const [incomingCall, setIncomingCall] = useState(null)
   const [activeCall, setActiveCall] = useState(null)
   const [callSignal, setCallSignal] = useState(null)
+
+  // Handle Android Hardware Back Button
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    const listener = App.addListener('backButton', () => {
+      // Do nothing if in an active call (let them use on-screen buttons)
+      if (activeCall) return;
+      
+      // If chat is open, close chat
+      if (selectedFriend) {
+        setSelectedFriend(null);
+      } else {
+        // If on the main dashboard tab, minimize app (sends to background)
+        App.minimizeApp();
+      }
+    });
+    
+    return () => {
+      listener.then(l => l.remove());
+    }
+  }, [activeCall, selectedFriend]);
 
   // Load user info if not available
   useEffect(() => {
