@@ -45,7 +45,10 @@ async function sendPushNotification(token, payload, channelId = 'default') {
         channelId: channelId,
         sound: isVoip ? 'ringtone' : 'default', // matches frontend channel sound
         priority: 'high',
-        visibility: 'public'
+        visibility: 'public',
+        clickAction: isVoip ? 'CALL_NOTIFICATION' : undefined,
+        sticky: isVoip,
+        ticker: isVoip ? 'Incoming Video Call' : undefined
       }
     },
     apns: {
