@@ -114,6 +114,13 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
       loadSentRequests()
     })
 
+    socket.on('initial_friends_status', (data) => {
+      setFriends(prev => prev.map(f => {
+        const status = data.find(s => s.userId === f.id)
+        return status ? { ...f, online_status: status.isOnline ? 1 : 0 } : f
+      }))
+    })
+
     socket.on('user_status_changed', (data) => {
       setFriends(prev => prev.map(f =>
         f.id === data.userId ? { ...f, online_status: data.isOnline ? 1 : 0 } : f
@@ -188,6 +195,7 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
     return () => {
       socket.off('friend_request_received')
       socket.off('friend_request_accepted')
+      socket.off('initial_friends_status')
       socket.off('user_status_changed')
       socket.off('incoming_call')
       socket.off('call_rejected')

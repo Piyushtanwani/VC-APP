@@ -6,9 +6,9 @@ RUN npm install --legacy-peer-deps
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Setup the backend and final image
-FROM node:20
-WORKDIR /app
+# Stage 2: Install backend dependencies (with build tools)
+FROM node:20 AS backend-builder
+WORKDIR /app/backend
 
 # Install build tools for native modules like better-sqlite3
 RUN apt-get update && apt-get install -y \
@@ -17,11 +17,18 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install backend dependencies first to leverage Docker layer caching
-COPY backend/package*.json ./backend/
-WORKDIR /app/backend
+COPY backend/package*.json ./
 RUN npm install --legacy-peer-deps --production
 
+# Stage 3: Setup the final production image
+FROM node:20-slim
+WORKDIR /app
+
+# Create backend directory
+WORKDIR /app/backend
+
+# Copy backend dependencies from Stage 2
+COPY --from=backend-builder /app/backend/node_modules ./node_modules
 # Copy backend source code
 COPY backend/ ./
 
@@ -29,7 +36,7 @@ COPY backend/ ./
 WORKDIR /app
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-# Expose the application port (Render will inject its own PORT env var)
+# Setup production environment
 WORKDIR /app/backend
 EXPOSE 3001
 ENV NODE_ENV=production

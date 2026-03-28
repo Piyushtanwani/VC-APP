@@ -3,6 +3,7 @@ const db = require('./db');
 const { sendPushNotification } = require('./utils/fcm');
 
 // Map userId -> socketId
+// Map userId -> Set(socketIds)
 const onlineUsers = new Map();
 // Map callerId -> { startTime, receiverId }
 const activeCalls = new Map();
@@ -29,11 +30,17 @@ function setupSocket(io) {
     console.log(`✅ ${username} connected (socket: ${socket.id})`);
 
     // Track online status
-    onlineUsers.set(userId, socket.id);
-    db.prepare('UPDATE users SET online_status = 1 WHERE id = ?').run(userId);
+    // Track online status with multiple sockets support
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, new Set());
+      db.prepare('UPDATE users SET online_status = 1 WHERE id = ?').run(userId);
+      // Notify friends that user is online (only if first connection)
+      broadcastOnlineStatus(io, userId, true);
+    }
+    onlineUsers.get(userId).add(socket.id);
 
-    // Notify friends that user is online
-    broadcastOnlineStatus(io, userId, true);
+    // Initial Sync: Send the user the status of all their friends
+    sendInitialFriendsStatus(socket, userId);
 
     // Send any pending notifications
     const notifications = db.prepare('SELECT * FROM notifications WHERE user_id = ? AND read = 0 ORDER BY created_at DESC').all(userId);
@@ -116,20 +123,22 @@ function setupSocket(io) {
         created_at: new Date().toISOString()
       };
 
-      // Send to receiver if online
-      const receiverSocketId = onlineUsers.get(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit('receive_message', msgData);
-      } else {
-        // Send push notification if offline
-        const receiver = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(receiverId);
-        if (receiver && receiver.fcm_token) {
-          sendPushNotification(receiver.fcm_token, {
-            title: `New message from ${username}`,
-            body: message.length > 50 ? message.substring(0, 47) + '...' : message,
-            data: { type: 'chat_message', senderId: userId.toString() }
-          });
-        }
+      // Send to receiver if online (directly via sockets)
+      const receiverSockets = onlineUsers.get(receiverId);
+      if (receiverSockets && receiverSockets.size > 0) {
+        receiverSockets.forEach(sId => {
+          io.to(sId).emit('receive_message', msgData);
+        });
+      }
+
+      // ALWAYS send push notification (handles cases where app is in background/minimized)
+      const receiver = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(receiverId);
+      if (receiver && receiver.fcm_token) {
+        sendPushNotification(receiver.fcm_token, {
+          title: `New message from ${username}`,
+          body: message.length > 50 ? message.substring(0, 47) + '...' : message,
+          data: { type: 'chat_message', senderId: userId.toString() }
+        });
       }
 
       // Confirm to sender
@@ -145,11 +154,13 @@ function setupSocket(io) {
       db.prepare(`UPDATE messages SET is_read = 1 WHERE id IN (${placeholders}) AND receiver_id = ?`).run(...messageIds, userId);
 
       // Notify the sender that their messages were read
-      const senderSocketId = onlineUsers.get(senderId);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit('messages_read', {
-          readerId: userId,
-          messageIds
+      const senderSockets = onlineUsers.get(senderId);
+      if (senderSockets) {
+        senderSockets.forEach(sId => {
+          io.to(sId).emit('messages_read', {
+            readerId: userId,
+            messageIds
+          });
         });
       }
     });
@@ -169,22 +180,15 @@ function setupSocket(io) {
         return;
       }
 
-      const targetSocketId = onlineUsers.get(targetId);
-      if (!targetSocketId) {
-        // Record missed call if receiver is offline
-        db.prepare('INSERT INTO call_history (caller_id, receiver_id, status, duration) VALUES (?, ?, ?, ?)')
-          .run(userId, targetId, 'missed', 0);
-        socket.emit('call_error', { error: 'User is offline' });
-        return;
+      const targetSockets = onlineUsers.get(targetId);
+      if (targetSockets) {
+        targetSockets.forEach(sId => {
+          io.to(sId).emit('incoming_call', {
+            from: { id: userId, username },
+            signal: data.signal
+          });
+        });
       }
-
-      // Track the pending call
-      activeCalls.set(userId, { startTime: null, receiverId: targetId });
-
-      io.to(targetSocketId).emit('incoming_call', {
-        from: { id: userId, username },
-        signal: data.signal
-      });
 
       // Also send push notification (always for calls, in case app is minimized)
       const receiver = db.prepare('SELECT fcm_token FROM users WHERE id = ?').get(targetId);
@@ -198,20 +202,22 @@ function setupSocket(io) {
     });
 
     socket.on('accept_call', (data) => {
-      const callerSocketId = onlineUsers.get(data.callerId);
-      if (callerSocketId) {
+      const callerSockets = onlineUsers.get(data.callerId);
+      if (callerSockets) {
         // Update tracking to started
         activeCalls.set(data.callerId, { startTime: Date.now(), receiverId: userId });
         
-        io.to(callerSocketId).emit('call_accepted', {
-          from: { id: userId, username },
-          signal: data.signal
+        callerSockets.forEach(sId => {
+          io.to(sId).emit('call_accepted', {
+            from: { id: userId, username },
+            signal: data.signal
+          });
         });
       }
     });
 
     socket.on('reject_call', (data) => {
-      const callerSocketId = onlineUsers.get(data.callerId);
+      const callerSockets = onlineUsers.get(data.callerId);
       
       // Log rejected call
       db.prepare('INSERT INTO call_history (caller_id, receiver_id, status, duration) VALUES (?, ?, ?, ?)')
@@ -220,15 +226,17 @@ function setupSocket(io) {
       // Remove from active tracking
       activeCalls.delete(data.callerId);
 
-      if (callerSocketId) {
-        io.to(callerSocketId).emit('call_rejected', {
-          from: { id: userId, username }
+      if (callerSockets) {
+        callerSockets.forEach(sId => {
+          io.to(sId).emit('call_rejected', {
+            from: { id: userId, username }
+          });
         });
       }
     });
 
     socket.on('end_call', (data) => {
-      const targetSocketId = onlineUsers.get(data.targetId);
+      const targetSockets = onlineUsers.get(data.targetId);
       
       // Handle call history recording
       // The call could have been started by either side, but we track by callerId
@@ -255,20 +263,24 @@ function setupSocket(io) {
         activeCalls.delete(callerId);
       }
 
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('call_ended', {
-          from: { id: userId, username }
+      if (targetSockets) {
+        targetSockets.forEach(sId => {
+          io.to(sId).emit('call_ended', {
+            from: { id: userId, username }
+          });
         });
       }
     });
 
     // WebRTC ICE candidates
     socket.on('ice_candidate', (data) => {
-      const targetSocketId = onlineUsers.get(data.targetId);
-      if (targetSocketId) {
-        io.to(targetSocketId).emit('ice_candidate', {
-          from: userId,
-          candidate: data.candidate
+      const targetSockets = onlineUsers.get(data.targetId);
+      if (targetSockets) {
+        targetSockets.forEach(sId => {
+          io.to(sId).emit('ice_candidate', {
+            from: userId,
+            candidate: data.candidate
+          });
         });
       }
     });
@@ -276,9 +288,16 @@ function setupSocket(io) {
     // ===== DISCONNECT =====
     socket.on('disconnect', () => {
       console.log(`❌ ${username} disconnected`);
-      onlineUsers.delete(userId);
-      db.prepare('UPDATE users SET online_status = 0 WHERE id = ?').run(userId);
-      broadcastOnlineStatus(io, userId, false);
+      
+      const sockets = onlineUsers.get(userId);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          onlineUsers.delete(userId);
+          db.prepare('UPDATE users SET online_status = 0 WHERE id = ?').run(userId);
+          broadcastOnlineStatus(io, userId, false);
+        }
+      }
     });
   });
 }
@@ -292,11 +311,33 @@ function broadcastOnlineStatus(io, userId, isOnline) {
   `).all(userId, userId, userId);
 
   friends.forEach(f => {
-    const friendSocketId = onlineUsers.get(f.friend_id);
-    if (friendSocketId) {
-      io.to(friendSocketId).emit('user_status_changed', { userId, isOnline });
+    const friendSockets = onlineUsers.get(f.friend_id);
+    if (friendSockets) {
+      friendSockets.forEach(sId => {
+        io.to(sId).emit('user_status_changed', { userId, isOnline });
+      });
     }
   });
+}
+
+function sendInitialFriendsStatus(socket, userId) {
+  // Get all friends and their current online status
+  const friends = db.prepare(`
+    SELECT CASE WHEN user1_id = ? THEN user2_id ELSE user1_id END as friend_id
+    FROM friends
+    WHERE user1_id = ? OR user2_id = ?
+  `).all(userId, userId, userId);
+
+  const statusList = friends.map(f => {
+    return {
+      userId: f.friend_id,
+      isOnline: onlineUsers.has(f.friend_id) && onlineUsers.get(f.friend_id).size > 0
+    };
+  });
+
+  if (statusList.length > 0) {
+    socket.emit('initial_friends_status', statusList);
+  }
 }
 
 module.exports = { setupSocket, onlineUsers };

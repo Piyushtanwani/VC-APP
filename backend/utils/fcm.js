@@ -39,6 +39,23 @@ async function sendPushNotification(token, payload, channelId = 'default') {
         sound: 'default'
       }
     },
+    apns: {
+      payload: {
+        aps: {
+          alert: {
+            title: payload.title,
+            body: payload.body,
+          },
+          sound: 'default',
+          badge: 1,
+          priority: 10
+        }
+      },
+      headers: {
+        'apns-priority': '10',
+        'apns-push-type': 'alert'
+      }
+    },
     data: payload.data || {},
     token: token
   };
