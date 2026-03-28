@@ -153,7 +153,7 @@ function setupSocket(io) {
               title: `New message from ${username}`,
               body: message.length > 50 ? message.substring(0, 47) + '...' : message,
               data: { type: 'chat_message', senderId: userId.toString() }
-            });
+            }, 'chat-messages');
           }
         }
 

@@ -99,6 +99,28 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
     loadCallHistory()
   }, [loadFriends, loadRequests, loadSentRequests, loadCallHistory])
 
+  // Check for pending notifications from cold start or tray action
+  useEffect(() => {
+    const pendingJson = sessionStorage.getItem('pendingNotification');
+    if (pendingJson) {
+      try {
+        const data = JSON.parse(pendingJson);
+        sessionStorage.removeItem('pendingNotification');
+        
+        if (data.type === 'chat_message' && data.senderId) {
+          const friend = friends.find(f => Number(f.id) === Number(data.senderId));
+          if (friend) setSelectedFriend(friend);
+        } else if (data.type === 'video_call' && data.callerId) {
+          // This should trigger the answer UI or friend select
+          const friend = friends.find(f => Number(f.id) === Number(data.callerId));
+          if (friend) handleStartCall(friend);
+        }
+      } catch (e) {
+        console.error('Error parsing pending notification:', e);
+      }
+    }
+  }, [friends]);
+
   // Socket and Push Notification Configuration
   useEffect(() => {
     // 1. Configure Notification Channels & Actions (Capacitor Native)
@@ -110,7 +132,7 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
         importance: 5, // High importance (Head-up)
         visibility: 1, // Public
         vibration: true,
-        sound: 'ringtone.mp3' // Placeholder for system ringtone if possible, otherwise default
+        sound: 'ringtone' // Use ringtone.mp3 in res/raw (without extension)
       });
 
       // Register "Accept" and "Decline" actions
@@ -129,20 +151,23 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
       // Handle Notification Actions
       const actionListener = LocalNotifications.addListener('localNotificationActionPerformed', (data) => {
         const { actionId, notification } = data;
-        const callData = notification.extra; // This should contain the caller info
+        const extra = notification.extra; 
 
         if (actionId === 'accept') {
-          // Open the specific chat/call
-          if (callData && callData.callerId) {
-            const friend = friends.find(f => f.id === parseInt(callData.callerId));
-            if (friend) {
-              handleStartCall(friend);
-            }
+          if (extra && extra.callerId) {
+            const friendId = Number(extra.callerId);
+            const friend = friends.find(f => Number(f.id) === friendId);
+            if (friend) handleStartCall(friend);
           }
         } else if (actionId === 'decline') {
-          // Send rejection via socket if connected, or via API
-          if (socket && callData && callData.callerId) {
-            socket.emit('reject_call', { callerId: parseInt(callData.callerId) });
+          if (socket && extra && extra.callerId) {
+            socket.emit('reject_call', { callerId: Number(extra.callerId) });
+          }
+        } else {
+          // General click (not button)
+          if (extra && extra.type === 'chat_message') {
+            const friend = friends.find(f => Number(f.id) === Number(extra.senderId));
+            if (friend) setSelectedFriend(friend);
           }
         }
       });

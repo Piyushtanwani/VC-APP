@@ -32,18 +32,18 @@ async function sendPushNotification(token, payload, channelId = 'default') {
   const message = {
     // For VoIP on Android, we use DATA-ONLY messages (no 'notification' block)
     // to trigger the app's background listener and show a full-screen calling UI.
-    ...(isVoip ? {} : {
-      notification: {
-        title: payload.title,
-        body: payload.body,
-      }
-    }),
+    // UPDATE: To ensure the app wake-up works even when the app is "Killed", 
+    // we now always provide a 'notification' block as a fallback.
+    notification: {
+      title: payload.title,
+      body: payload.body,
+    },
     android: {
       priority: 'high',
       ttl: 0, // Deliver immediately
-      notification: isVoip ? undefined : {
+      notification: {
         channelId: channelId,
-        sound: 'default',
+        sound: isVoip ? 'ringtone' : 'default', // matches frontend channel sound
         priority: 'high',
         visibility: 'public'
       }
@@ -62,7 +62,7 @@ async function sendPushNotification(token, payload, channelId = 'default') {
       },
       headers: {
         'apns-priority': '10',
-        'apns-push-type': 'alert'
+        'apns-push-type': isVoip ? 'background' : 'alert'
       }
     },
     data: payload.data || {},

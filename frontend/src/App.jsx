@@ -68,7 +68,13 @@ export default function App() {
       })
 
       PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-        console.log('Push action performed: ' + JSON.stringify(notification))
+        console.log('Push action performed:', notification)
+        const { data } = notification.notification
+        if (data && data.senderId) {
+          // Store in session storage for Dashboard to pick up on mount
+          sessionStorage.setItem('pendingNotification', JSON.stringify(data))
+          window.location.reload() // Force reload to ensure Dashboard picks it up if already in a weird state
+        }
       })
     }
   }, [])
