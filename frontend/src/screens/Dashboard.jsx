@@ -99,7 +99,88 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
     loadCallHistory()
   }, [loadFriends, loadRequests, loadSentRequests, loadCallHistory])
 
-  // Socket events
+  // Socket and Push Notification Configuration
+  useEffect(() => {
+    // 1. Configure Notification Channels & Actions (Capacitor Native)
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.createChannel({
+        id: 'calls',
+        name: 'Incoming Calls',
+        description: 'Persistent notifications for incoming video calls',
+        importance: 5, // High importance (Head-up)
+        visibility: 1, // Public
+        vibration: true,
+        sound: 'ringtone.mp3' // Placeholder for system ringtone if possible, otherwise default
+      });
+
+      // Register "Accept" and "Decline" actions
+      LocalNotifications.registerActionTypes({
+        types: [
+          {
+            id: 'CALL_NOTIFICATION',
+            actions: [
+              { id: 'accept', title: 'Accept', foreground: true },
+              { id: 'decline', title: 'Decline', destructive: true, foreground: false }
+            ]
+          }
+        ]
+      });
+
+      // Handle Notification Actions
+      const actionListener = LocalNotifications.addListener('localNotificationActionPerformed', (data) => {
+        const { actionId, notification } = data;
+        const callData = notification.extra; // This should contain the caller info
+
+        if (actionId === 'accept') {
+          // Open the specific chat/call
+          if (callData && callData.callerId) {
+            const friend = friends.find(f => f.id === parseInt(callData.callerId));
+            if (friend) {
+              handleStartCall(friend);
+            }
+          }
+        } else if (actionId === 'decline') {
+          // Send rejection via socket if connected, or via API
+          if (socket && callData && callData.callerId) {
+            socket.emit('reject_call', { callerId: parseInt(callData.callerId) });
+          }
+        }
+      });
+
+      // Handle Incoming Push Messages (Wakeup)
+      // When a data-only message arrives in background
+      import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+        PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          console.log('Push received:', notification);
+          
+          const { data } = notification;
+          if (data && data.isVoip === 'true') {
+            // Manually show local notification with buttons
+            LocalNotifications.schedule({
+              notifications: [
+                {
+                  title: data.title || 'Incoming Video Call',
+                  body: data.body || 'Someone is calling you...',
+                  id: Date.now(),
+                  schedule: { at: new Date(Date.now() + 100) },
+                  sound: 'ringtone',
+                  channelId: 'calls',
+                  actionTypeId: 'CALL_NOTIFICATION',
+                  extra: data
+                }
+              ]
+            });
+          }
+        });
+      });
+
+      return () => {
+        actionListener.remove();
+      }
+    }
+  }, [socket, friends])
+
+  // Main Socket events
   useEffect(() => {
     if (!socket) return
 

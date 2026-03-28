@@ -22,10 +22,9 @@ router.post('/send-otp', async (req, res) => {
 
     // If purpose is registration, check if user exists
     if (purpose === 'registration') {
-      // Only check for username existence, as multiple users can share an email
       if (username) {
-        const existingUser = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)').get(username);
-        if (existingUser) {
+        const userRes = await db.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+        if (userRes.rows.length > 0) {
           return res.status(400).json({ error: 'Username already exists' });
         }
       } else {
@@ -37,11 +36,13 @@ router.post('/send-otp', async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 mins
 
     // Delete existing OTPs for this email/purpose
-    db.prepare('DELETE FROM otp_verifications WHERE email = ? AND purpose = ?').run(email, purpose);
+    await db.query('DELETE FROM otp_verifications WHERE email = $1 AND purpose = $2', [email, purpose]);
     
     // Save new OTP
-    db.prepare('INSERT INTO otp_verifications (email, code, purpose, expires_at) VALUES (?, ?, ?, ?)')
-      .run(email, code, purpose, expiresAt);
+    await db.query(
+      'INSERT INTO otp_verifications (email, code, purpose, expires_at) VALUES ($1, $2, $3, $4)',
+      [email, code, purpose, expiresAt]
+    );
 
     const sent = await sendOTP(email, code, purpose);
     if (sent) {
@@ -56,7 +57,7 @@ router.post('/send-otp', async (req, res) => {
 });
 
 // Register
-router.post('/register', (req, res) => {
+router.post('/register', async (req, res) => {
   try {
     const { username, email, password, otpCode, fcmToken } = req.body;
 
@@ -73,8 +74,11 @@ router.post('/register', (req, res) => {
     }
 
     // Verify OTP
-    const otp = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND code = ? AND purpose = ?')
-      .get(email, otpCode, 'registration');
+    const otpRes = await db.query(
+      'SELECT * FROM otp_verifications WHERE email = $1 AND code = $2 AND purpose = $3',
+      [email, otpCode, 'registration']
+    );
+    const otp = otpRes.rows[0];
 
     if (!otp) {
       return res.status(401).json({ error: 'Invalid or expired OTP' });
@@ -84,27 +88,27 @@ router.post('/register', (req, res) => {
       return res.status(401).json({ error: 'OTP has expired' });
     }
 
-    // Check for existing username only
-    const existingUser = db.prepare('SELECT * FROM users WHERE LOWER(username) = LOWER(?)').get(username);
-    if (existingUser) {
+    // Check for existing username
+    const existingUserRes = await db.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
+    if (existingUserRes.rows.length > 0) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
     // Delete OTP after use
-    db.prepare('DELETE FROM otp_verifications WHERE id = ?').run(otp.id);
+    await db.query('DELETE FROM otp_verifications WHERE id = $1', [otp.id]);
 
     const password_hash = bcrypt.hashSync(password, 10);
-    const stmt = db.prepare(`
-      INSERT INTO users (username, email, password_hash, fcm_token) 
-      VALUES (?, ?, ?, ?)
-    `);
-    const result = stmt.run(username, email, password_hash, fcmToken || null);
+    const insertRes = await db.query(
+      'INSERT INTO users (username, email, password_hash, fcm_token) VALUES ($1, $2, $3, $4) RETURNING id',
+      [username, email, password_hash, fcmToken || null]
+    );
+    const newUserId = insertRes.rows[0].id;
 
-    const token = jwt.sign({ id: result.lastInsertRowid, username }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: newUserId, username }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.status(201).json({
       token,
-      user: { id: result.lastInsertRowid, username, email }
+      user: { id: newUserId, username, email }
     });
   } catch (err) {
     console.error('Register error:', err);
@@ -113,7 +117,7 @@ router.post('/register', (req, res) => {
 });
 
 // Login
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { username, password, fcmToken } = req.body;
 
@@ -121,7 +125,8 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    const userRes = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = userRes.rows[0];
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -134,7 +139,7 @@ router.post('/login', (req, res) => {
     const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     if (fcmToken) {
-      db.prepare('UPDATE users SET fcm_token = ? WHERE id = ?').run(fcmToken, user.id);
+      await db.query('UPDATE users SET fcm_token = $1 WHERE id = $2', [fcmToken, user.id]);
     }
 
     res.json({
@@ -148,9 +153,10 @@ router.post('/login', (req, res) => {
 });
 
 // Get current user
-router.get('/me', authenticateToken, (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = db.prepare('SELECT id, username, email, online_status FROM users WHERE id = ?').get(req.user.id);
+    const userRes = await db.query('SELECT id, username, email, online_status FROM users WHERE id = $1', [req.user.id]);
+    const user = userRes.rows[0];
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -166,16 +172,14 @@ router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
 
-    // We don't check for user existence here to avoid revealing valid emails.
-    // The OTP will be sent if the email exists, and the user will need to provide
-    // the correct username during reset.
-
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    db.prepare('DELETE FROM otp_verifications WHERE email = ? AND purpose = ?').run(email, 'password_reset');
-    db.prepare('INSERT INTO otp_verifications (email, code, purpose, expires_at) VALUES (?, ?, ?, ?)')
-      .run(email, code, 'password_reset', expiresAt);
+    await db.query('DELETE FROM otp_verifications WHERE email = $1 AND purpose = $2', [email, 'password_reset']);
+    await db.query(
+      'INSERT INTO otp_verifications (email, code, purpose, expires_at) VALUES ($1, $2, $3, $4)',
+      [email, code, 'password_reset', expiresAt]
+    );
 
     await sendOTP(email, code, 'password_reset');
     res.json({ message: 'If an account exists with this email, an OTP has been sent.' });
@@ -185,30 +189,34 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset Password
-router.post('/reset-password', (req, res) => {
+router.post('/reset-password', async (req, res) => {
   try {
     const { email, code, newPassword, username } = req.body;
 
-  if (!email || !code || !newPassword || !username) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+    if (!email || !code || !newPassword || !username) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
 
-    const otp = db.prepare('SELECT * FROM otp_verifications WHERE email = ? AND code = ? AND purpose = ?')
-      .get(email, code, 'password_reset');
+    const otpRes = await db.query(
+      'SELECT * FROM otp_verifications WHERE email = $1 AND code = $2 AND purpose = $3',
+      [email, code, 'password_reset']
+    );
+    const otp = otpRes.rows[0];
 
     if (!otp || new Date(otp.expires_at) < new Date()) {
       return res.status(401).json({ error: 'Invalid or expired OTP' });
     }
 
     const hashedPassword = bcrypt.hashSync(newPassword, 10);
-    // Update specific user with that email and username
-    const result = db.prepare('UPDATE users SET password_hash = ? WHERE LOWER(email) = LOWER(?) AND LOWER(username) = LOWER(?)')
-      .run(hashedPassword, email, username);
+    const updateRes = await db.query(
+      'UPDATE users SET password_hash = $1 WHERE LOWER(email) = LOWER($2) AND LOWER(username) = LOWER($3)',
+      [hashedPassword, email, username]
+    );
 
-    if (result.changes === 0) {
+    if (updateRes.rowCount === 0) {
       return res.status(404).json({ error: 'User not found with this email/username combination' });
     }
-    db.prepare('DELETE FROM otp_verifications WHERE id = ?').run(otp.id);
+    await db.query('DELETE FROM otp_verifications WHERE id = $1', [otp.id]);
 
     res.json({ message: 'Password reset successful' });
   } catch (err) {
@@ -216,28 +224,27 @@ router.post('/reset-password', (req, res) => {
   }
 });
 
-// Update FCM Token
-// New: Find usernames associated with an email
-router.get('/accounts', (req, res) => {
+// Get usernames associated with an email
+router.get('/accounts', async (req, res) => {
   const { email } = req.query;
   if (!email) {
     return res.status(400).json({ error: 'Email is required' });
   }
 
   try {
-    const users = db.prepare('SELECT username FROM users WHERE LOWER(email) = LOWER(?)').all(email);
-    res.json(users.map(u => u.username));
+    const usersRes = await db.query('SELECT username FROM users WHERE LOWER(email) = LOWER($1)', [email]);
+    res.json(usersRes.rows.map(u => u.username));
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.post('/fcm-token', authenticateToken, (req, res) => {
+router.post('/fcm-token', authenticateToken, async (req, res) => {
   try {
     const { fcmToken } = req.body;
     if (!fcmToken) return res.status(400).json({ error: 'FCM token is required' });
 
-    db.prepare('UPDATE users SET fcm_token = ? WHERE id = ?').run(fcmToken, req.user.id);
+    await db.query('UPDATE users SET fcm_token = $1 WHERE id = $2', [fcmToken, req.user.id]);
     res.json({ message: 'FCM token updated successfully' });
   } catch (err) {
     console.error('Update FCM token error:', err);

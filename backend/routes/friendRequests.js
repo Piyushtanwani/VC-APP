@@ -5,7 +5,7 @@ const { authenticateToken } = require('../middleware/auth');
 const router = express.Router();
 
 // Send friend request
-router.post('/send', authenticateToken, (req, res) => {
+router.post('/send', authenticateToken, async (req, res) => {
   try {
     const { receiverId } = req.body;
     const senderId = req.user.id;
@@ -14,29 +14,30 @@ router.post('/send', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Cannot send request to yourself' });
     }
 
-    const receiverUser = db.prepare('SELECT id FROM users WHERE id = ?').get(receiverId);
-    if (!receiverUser) {
+    const receiverRes = await db.query('SELECT id FROM users WHERE id = $1', [receiverId]);
+    if (receiverRes.rows.length === 0) {
       return res.status(404).json({ error: 'User does not exist' });
     }
 
     // Check if already friends
-    const friendship = db.prepare(`
+    const friendshipRes = await db.query(`
       SELECT id FROM friends
-      WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
-    `).get(senderId, receiverId, receiverId, senderId);
+      WHERE (user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1)
+    `, [senderId, receiverId]);
 
-    if (friendship) {
+    if (friendshipRes.rows.length > 0) {
       return res.status(400).json({ error: 'Already friends' });
     }
 
     // Check if request already exists
-    const existing = db.prepare(`
+    const existingRes = await db.query(`
       SELECT id, status FROM friend_requests
-      WHERE (sender_id = ? AND receiver_id = ?)
-         OR (sender_id = ? AND receiver_id = ?)
-    `).get(senderId, receiverId, receiverId, senderId);
+      WHERE (sender_id = $1 AND receiver_id = $2)
+         OR (sender_id = $2 AND receiver_id = $1)
+    `, [senderId, receiverId]);
 
-    if (existing) {
+    if (existingRes.rows.length > 0) {
+      const existing = existingRes.rows[0];
       if (existing.status === 'pending') {
         return res.status(400).json({ error: 'Request already pending' });
       }
@@ -44,28 +45,40 @@ router.post('/send', authenticateToken, (req, res) => {
         return res.status(400).json({ error: 'Already friends' });
       }
       // If rejected, allow re-sending by updating the existing record
-      db.prepare(`UPDATE friend_requests SET sender_id = ?, receiver_id = ?, status = 'pending', created_at = datetime('now') WHERE id = ?`)
-        .run(senderId, receiverId, existing.id);
+      await db.query(`
+        UPDATE friend_requests 
+        SET sender_id = $1, receiver_id = $2, status = 'pending', created_at = CURRENT_TIMESTAMP 
+        WHERE id = $3
+      `, [senderId, receiverId, existing.id]);
 
-      const sender = db.prepare('SELECT id, username FROM users WHERE id = ?').get(senderId);
+      const senderRes = await db.query('SELECT id, username FROM users WHERE id = $1', [senderId]);
+      const sender = senderRes.rows[0];
 
       // Store notification for offline user
-      db.prepare('INSERT INTO notifications (user_id, type, data) VALUES (?, ?, ?)')
-        .run(receiverId, 'friend_request_received', JSON.stringify({ from: sender }));
+      await db.query(
+        'INSERT INTO notifications (user_id, type, data) VALUES ($1, $2, $3)',
+        [receiverId, 'friend_request_received', JSON.stringify({ from: sender })]
+      );
 
       return res.json({ message: 'Friend request re-sent', requestId: existing.id });
     }
 
-    const result = db.prepare('INSERT INTO friend_requests (sender_id, receiver_id) VALUES (?, ?)')
-      .run(senderId, receiverId);
+    const insertRes = await db.query(
+      'INSERT INTO friend_requests (sender_id, receiver_id) VALUES ($1, $2) RETURNING id',
+      [senderId, receiverId]
+    );
+    const requestId = insertRes.rows[0].id;
 
-    const sender = db.prepare('SELECT id, username FROM users WHERE id = ?').get(senderId);
+    const senderRes = await db.query('SELECT id, username FROM users WHERE id = $1', [senderId]);
+    const sender = senderRes.rows[0];
 
     // Store notification for offline user
-    db.prepare('INSERT INTO notifications (user_id, type, data) VALUES (?, ?, ?)')
-      .run(receiverId, 'friend_request_received', JSON.stringify({ from: sender, requestId: result.lastInsertRowid }));
+    await db.query(
+      'INSERT INTO notifications (user_id, type, data) VALUES ($1, $2, $3)',
+      [receiverId, 'friend_request_received', JSON.stringify({ from: sender, requestId: requestId })]
+    );
 
-    res.status(201).json({ message: 'Friend request sent', requestId: result.lastInsertRowid });
+    res.status(201).json({ message: 'Friend request sent', requestId: requestId });
   } catch (err) {
     console.error('Send request error:', err);
     res.status(500).json({ error: 'Server error' });
@@ -73,7 +86,7 @@ router.post('/send', authenticateToken, (req, res) => {
 });
 
 // Respond to friend request
-router.post('/respond', authenticateToken, (req, res) => {
+router.post('/respond', authenticateToken, async (req, res) => {
   try {
     const { requestId, action } = req.body;
     const userId = req.user.id;
@@ -82,27 +95,37 @@ router.post('/respond', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Action must be accept or reject' });
     }
 
-    const request = db.prepare('SELECT * FROM friend_requests WHERE id = ? AND receiver_id = ? AND status = ?')
-      .get(requestId, userId, 'pending');
+    const requestRes = await db.query(
+      'SELECT * FROM friend_requests WHERE id = $1 AND receiver_id = $2 AND status = $3',
+      [requestId, userId, 'pending']
+    );
+    const request = requestRes.rows[0];
 
     if (!request) {
       return res.status(404).json({ error: 'Friend request not found' });
     }
 
     const newStatus = action === 'accept' ? 'accepted' : 'rejected';
-    db.prepare('UPDATE friend_requests SET status = ? WHERE id = ?').run(newStatus, requestId);
+    await db.query('UPDATE friend_requests SET status = $1 WHERE id = $2', [newStatus, requestId]);
 
     if (action === 'accept') {
       // Create friendship (lower id always first for consistency)
       const user1 = Math.min(request.sender_id, request.receiver_id);
       const user2 = Math.max(request.sender_id, request.receiver_id);
-      db.prepare('INSERT OR IGNORE INTO friends (user1_id, user2_id) VALUES (?, ?)').run(user1, user2);
+      
+      await db.query(
+        'INSERT INTO friends (user1_id, user2_id) VALUES ($1, $2) ON CONFLICT (user1_id, user2_id) DO NOTHING',
+        [user1, user2]
+      );
 
-      const acceptor = db.prepare('SELECT id, username FROM users WHERE id = ?').get(userId);
+      const acceptorRes = await db.query('SELECT id, username FROM users WHERE id = $1', [userId]);
+      const acceptor = acceptorRes.rows[0];
 
       // Store notification for sender
-      db.prepare('INSERT INTO notifications (user_id, type, data) VALUES (?, ?, ?)')
-        .run(request.sender_id, 'friend_request_accepted', JSON.stringify({ from: acceptor }));
+      await db.query(
+        'INSERT INTO notifications (user_id, type, data) VALUES ($1, $2, $3)',
+        [request.sender_id, 'friend_request_accepted', JSON.stringify({ from: acceptor })]
+      );
     }
 
     res.json({ message: `Friend request ${newStatus}` });
@@ -113,36 +136,36 @@ router.post('/respond', authenticateToken, (req, res) => {
 });
 
 // Get pending friend requests (received)
-router.get('/', authenticateToken, (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const requests = db.prepare(`
+    const requestsRes = await db.query(`
       SELECT fr.id, fr.sender_id, fr.status, fr.created_at,
              u.username as sender_username
       FROM friend_requests fr
       JOIN users u ON u.id = fr.sender_id
-      WHERE fr.receiver_id = ? AND fr.status = 'pending'
+      WHERE fr.receiver_id = $1 AND fr.status = 'pending'
       ORDER BY fr.created_at DESC
-    `).all(req.user.id);
+    `, [req.user.id]);
 
-    res.json({ requests });
+    res.json({ requests: requestsRes.rows });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Get sent friend requests
-router.get('/sent', authenticateToken, (req, res) => {
+router.get('/sent', authenticateToken, async (req, res) => {
   try {
-    const requests = db.prepare(`
+    const requestsRes = await db.query(`
       SELECT fr.id, fr.receiver_id, fr.status, fr.created_at,
              u.username as receiver_username
       FROM friend_requests fr
       JOIN users u ON u.id = fr.receiver_id
-      WHERE fr.sender_id = ?
+      WHERE fr.sender_id = $1
       ORDER BY fr.created_at DESC
-    `).all(req.user.id);
+    `, [req.user.id]);
 
-    res.json({ requests });
+    res.json({ requests: requestsRes.rows });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }

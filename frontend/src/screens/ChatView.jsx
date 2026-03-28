@@ -55,9 +55,15 @@ export default function ChatView({ friend, currentUser, onStartCall, onBack }) {
     }
   }, [socket, friend])
 
-  // Mark incoming messages as read
-  useEffect(() => {
+  // Mark incoming messages as read only if window is active and focused
+  const markMessagesAsRead = useCallback(() => {
     if (!socket || !friend || messages.length === 0) return
+
+    // Check if the app is in the foreground and has focus
+    const isVisible = document.visibilityState === 'visible'
+    const isFocused = document.hasFocus()
+
+    if (!isVisible || !isFocused) return
 
     const unreadFromFriend = messages
       .filter(m => m.sender_id === friend.id && !m.is_read)
@@ -74,6 +80,23 @@ export default function ChatView({ friend, currentUser, onStartCall, onBack }) {
       ))
     }
   }, [socket, friend, messages])
+
+  // Trigger mark as read when messages change or when user returns to app
+  useEffect(() => {
+    markMessagesAsRead()
+
+    const handleActivity = () => {
+      markMessagesAsRead()
+    }
+
+    window.addEventListener('visibilitychange', handleActivity)
+    window.addEventListener('focus', handleActivity)
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleActivity)
+      window.removeEventListener('focus', handleActivity)
+    }
+  }, [markMessagesAsRead])
 
   // Listen for sent message confirmations and read receipts
   useEffect(() => {

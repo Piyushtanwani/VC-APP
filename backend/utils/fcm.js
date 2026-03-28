@@ -27,16 +27,25 @@ async function sendPushNotification(token, payload, channelId = 'default') {
   if (!admin.apps.length) return false;
   if (!token) return false;
 
+  const isVoip = channelId === 'calls';
+
   const message = {
-    notification: {
-      title: payload.title,
-      body: payload.body,
-    },
+    // For VoIP on Android, we use DATA-ONLY messages (no 'notification' block)
+    // to trigger the app's background listener and show a full-screen calling UI.
+    ...(isVoip ? {} : {
+      notification: {
+        title: payload.title,
+        body: payload.body,
+      }
+    }),
     android: {
       priority: 'high',
-      notification: {
+      ttl: 0, // Deliver immediately
+      notification: isVoip ? undefined : {
         channelId: channelId,
-        sound: 'default'
+        sound: 'default',
+        priority: 'high',
+        visibility: 'public'
       }
     },
     apns: {
@@ -48,7 +57,7 @@ async function sendPushNotification(token, payload, channelId = 'default') {
           },
           sound: 'default',
           badge: 1,
-          priority: 10
+          'content-available': 1 // Wake up app in background
         }
       },
       headers: {
@@ -60,9 +69,16 @@ async function sendPushNotification(token, payload, channelId = 'default') {
     token: token
   };
 
+  // Add more call-specific data for VoIP
+  if (isVoip) {
+    message.data.isVoip = 'true';
+    message.data.title = payload.title;
+    message.data.body = payload.body;
+  }
+
   try {
     const response = await admin.messaging().send(message);
-    console.log('✅ Push notification sent successfully:', response);
+    console.log(`✅ ${isVoip ? 'VoIP' : 'Push'} notification sent:`, response);
     return true;
   } catch (error) {
     console.error('❌ Error sending push notification:', error);
