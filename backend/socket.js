@@ -25,16 +25,20 @@ function setupSocket(io) {
   });
 
   io.on('connection', async (socket) => {
-    const userId = socket.user.id;
+    const userId = Number(socket.user.id);
     const username = socket.user.username;
-    console.log(`✅ ${username} connected (socket: ${socket.id})`);
+    console.log(`✅ ${username} connected (ID: ${userId}, Socket: ${socket.id})`);
 
     // Track online status
     if (!onlineUsers.has(userId)) {
       onlineUsers.set(userId, new Set());
-      await db.query('UPDATE users SET online_status = 1 WHERE id = $1', [userId]);
-      // Notify friends that user is online
-      broadcastOnlineStatus(io, userId, true);
+      try {
+        await db.query('UPDATE users SET online_status = 1 WHERE id = $1', [userId]);
+        console.log(`🌐 User ${username} marked online in DB`);
+        broadcastOnlineStatus(io, userId, true);
+      } catch (err) {
+        console.error(`❌ DB error marking user online:`, err);
+      }
     }
     onlineUsers.get(userId).add(socket.id);
 
@@ -48,6 +52,7 @@ function setupSocket(io) {
         [userId]
       );
       if (notifRes.rows.length > 0) {
+        console.log(`🔔 Sending ${notifRes.rows.length} pending notifications to ${username}`);
         socket.emit('pending_notifications', notifRes.rows.map(n => ({
           ...n,
           data: JSON.parse(n.data)
@@ -60,14 +65,17 @@ function setupSocket(io) {
 
     // ===== FRIEND REQUEST EVENTS =====
     socket.on('send_friend_request', async (data) => {
-      const receiverSocketId = onlineUsers.get(data.receiverId);
-      if (receiverSocketId) {
-        io.to(Array.from(receiverSocketId)).emit('friend_request_received', {
+      const targetId = Number(data.receiverId);
+      console.log(`📩 ${username} sending friend request to ID: ${targetId}`);
+      const receiverSockets = onlineUsers.get(targetId);
+      
+      if (receiverSockets) {
+        io.to(Array.from(receiverSockets)).emit('friend_request_received', {
           from: { id: userId, username },
           requestId: data.requestId
         });
       } else {
-        const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [data.receiverId]);
+        const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [targetId]);
         const receiver = userRes.rows[0];
         if (receiver && receiver.fcm_token) {
           sendPushNotification(receiver.fcm_token, {
@@ -80,15 +88,16 @@ function setupSocket(io) {
     });
 
     socket.on('respond_friend_request', async (data) => {
+      const targetId = Number(data.senderId);
       if (data.action === 'accept') {
-        const senderSocketId = onlineUsers.get(data.senderId);
-        if (senderSocketId) {
-          io.to(Array.from(senderSocketId)).emit('friend_request_accepted', {
+        const senderSockets = onlineUsers.get(targetId);
+        if (senderSockets) {
+          io.to(Array.from(senderSockets)).emit('friend_request_accepted', {
             from: { id: userId, username }
           });
         }
         
-        const senderRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [data.senderId]);
+        const senderRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [targetId]);
         const sender = senderRes.rows[0];
         if (sender && sender.fcm_token) {
           sendPushNotification(sender.fcm_token, {
@@ -102,7 +111,8 @@ function setupSocket(io) {
 
     // ===== CHAT EVENTS =====
     socket.on('send_message', async (data) => {
-      const { receiverId, message } = data;
+      const receiverId = Number(data.receiverId);
+      const { message } = data;
 
       try {
         const friendRes = await db.query(`
@@ -135,16 +145,16 @@ function setupSocket(io) {
           receiverSockets.forEach(sId => {
             io.to(sId).emit('receive_message', msgData);
           });
-        }
-
-        const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [receiverId]);
-        const receiver = userRes.rows[0];
-        if (receiver && receiver.fcm_token) {
-          sendPushNotification(receiver.fcm_token, {
-            title: `New message from ${username}`,
-            body: message.length > 50 ? message.substring(0, 47) + '...' : message,
-            data: { type: 'chat_message', senderId: userId.toString() }
-          });
+        } else {
+          const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [receiverId]);
+          const receiver = userRes.rows[0];
+          if (receiver && receiver.fcm_token) {
+            sendPushNotification(receiver.fcm_token, {
+              title: `New message from ${username}`,
+              body: message.length > 50 ? message.substring(0, 47) + '...' : message,
+              data: { type: 'chat_message', senderId: userId.toString() }
+            });
+          }
         }
 
         socket.emit('message_sent', msgData);
@@ -155,6 +165,7 @@ function setupSocket(io) {
 
     socket.on('mark_read', async (data) => {
       const { messageIds, senderId } = data;
+      const targetId = Number(senderId);
       if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) return;
 
       try {
@@ -163,7 +174,7 @@ function setupSocket(io) {
           [messageIds, userId]
         );
 
-        const senderSockets = onlineUsers.get(senderId);
+        const senderSockets = onlineUsers.get(targetId);
         if (senderSockets) {
           senderSockets.forEach(sId => {
             io.to(sId).emit('messages_read', {
@@ -179,7 +190,8 @@ function setupSocket(io) {
 
     // ===== VIDEO CALL EVENTS =====
     socket.on('call_user', async (data) => {
-      const { targetId } = data;
+      const targetId = Number(data.targetId);
+      console.log(`📞 ${username} calling user ID: ${targetId}`);
 
       const friendRes = await db.query(`
         SELECT id FROM friends
@@ -187,12 +199,14 @@ function setupSocket(io) {
       `, [userId, targetId]);
 
       if (friendRes.rows.length === 0) {
+        console.log(`⚠️ User ${username} tried to call ID ${targetId} without friendship`);
         socket.emit('call_error', { error: 'You can only call friends' });
         return;
       }
 
       const targetSockets = onlineUsers.get(targetId);
       if (targetSockets) {
+        console.log(`📱 Routing call to ${targetSockets.size} active sockets for ID: ${targetId}`);
         targetSockets.forEach(sId => {
           io.to(sId).emit('incoming_call', {
             from: { id: userId, username },
@@ -204,18 +218,22 @@ function setupSocket(io) {
       const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [targetId]);
       const receiver = userRes.rows[0];
       if (receiver && receiver.fcm_token) {
+        console.log(`🔕 Sending VoIP Wakeup Push to ID: ${targetId}`);
         sendPushNotification(receiver.fcm_token, {
           title: 'Incoming Video Call',
           body: `${username} is calling you...`,
-          data: { type: 'video_call', callerId: userId.toString() }
+          data: { type: 'video_call', callerId: userId.toString(), isVoip: 'true' }
         }, 'calls');
       }
     });
 
     socket.on('accept_call', (data) => {
-      const callerSockets = onlineUsers.get(data.callerId);
+      const callerId = Number(data.callerId);
+      const callerSockets = onlineUsers.get(callerId);
+      console.log(`✅ ${username} accepted call from ID: ${callerId}`);
+      
       if (callerSockets) {
-        activeCalls.set(data.callerId, { startTime: Date.now(), receiverId: userId });
+        activeCalls.set(callerId, { startTime: Date.now(), receiverId: userId });
         callerSockets.forEach(sId => {
           io.to(sId).emit('call_accepted', {
             from: { id: userId, username },
@@ -226,12 +244,15 @@ function setupSocket(io) {
     });
 
     socket.on('reject_call', async (data) => {
-      const callerSockets = onlineUsers.get(data.callerId);
+      const callerId = Number(data.callerId);
+      const callerSockets = onlineUsers.get(callerId);
+      console.log(`🚫 ${username} rejected call from ID: ${callerId}`);
+      
       await db.query(
         'INSERT INTO call_history (caller_id, receiver_id, status, duration) VALUES ($1, $2, $3, $4)',
-        [data.callerId, userId, 'rejected', 0]
+        [callerId, userId, 'rejected', 0]
       );
-      activeCalls.delete(data.callerId);
+      activeCalls.delete(callerId);
 
       if (callerSockets) {
         callerSockets.forEach(sId => {
@@ -241,10 +262,13 @@ function setupSocket(io) {
     });
 
     socket.on('end_call', async (data) => {
-      const targetSockets = onlineUsers.get(data.targetId);
-      let callInfo = activeCalls.get(userId) || activeCalls.get(data.targetId);
-      let callerId = activeCalls.has(userId) ? userId : data.targetId;
-      let receiverId = activeCalls.has(userId) ? data.targetId : userId;
+      const targetId = Number(data.targetId);
+      const targetSockets = onlineUsers.get(targetId);
+      console.log(`📵 ${username} ended call session with ID: ${targetId}`);
+      
+      let callInfo = activeCalls.get(userId) || activeCalls.get(targetId);
+      let callerId = activeCalls.has(userId) ? userId : targetId;
+      let receiverId = activeCalls.has(userId) ? targetId : userId;
 
       if (callInfo) {
         const duration = callInfo.startTime ? Math.floor((Date.now() - callInfo.startTime) / 1000) : 0;
@@ -263,7 +287,8 @@ function setupSocket(io) {
     });
 
     socket.on('ice_candidate', (data) => {
-      const targetSockets = onlineUsers.get(data.targetId);
+      const targetId = Number(data.targetId);
+      const targetSockets = onlineUsers.get(targetId);
       if (targetSockets) {
         targetSockets.forEach(sId => {
           io.to(sId).emit('ice_candidate', { from: userId, candidate: data.candidate });
@@ -272,14 +297,18 @@ function setupSocket(io) {
     });
 
     socket.on('disconnect', async () => {
-      console.log(`❌ ${username} disconnected`);
+      console.log(`❌ ${username} disconnected (ID: ${userId})`);
       const sockets = onlineUsers.get(userId);
       if (sockets) {
         sockets.delete(socket.id);
         if (sockets.size === 0) {
           onlineUsers.delete(userId);
-          await db.query('UPDATE users SET online_status = 0 WHERE id = $1', [userId]);
-          broadcastOnlineStatus(io, userId, false);
+          try {
+            await db.query('UPDATE users SET online_status = 0 WHERE id = $1', [userId]);
+            broadcastOnlineStatus(io, userId, false);
+          } catch (err) {
+            console.error('❌ DB error marking user offline:', err);
+          }
         }
       }
     });
@@ -287,33 +316,39 @@ function setupSocket(io) {
 }
 
 async function broadcastOnlineStatus(io, userId, isOnline) {
+  const normUserId = Number(userId);
   const friendsRes = await db.query(`
     SELECT CASE WHEN user1_id = $1 THEN user2_id ELSE user1_id END as friend_id
     FROM friends
     WHERE user1_id = $1 OR user2_id = $1
-  `, [userId]);
+  `, [normUserId]);
 
   friendsRes.rows.forEach(f => {
-    const friendSockets = onlineUsers.get(f.friend_id);
+    const friendId = Number(f.friend_id);
+    const friendSockets = onlineUsers.get(friendId);
     if (friendSockets) {
       friendSockets.forEach(sId => {
-        io.to(sId).emit('user_status_changed', { userId, isOnline });
+        io.to(sId).emit('user_status_changed', { userId: normUserId, isOnline });
       });
     }
   });
 }
 
 async function sendInitialFriendsStatus(socket, userId) {
+  const normUserId = Number(userId);
   const friendsRes = await db.query(`
     SELECT CASE WHEN user1_id = $1 THEN user2_id ELSE user1_id END as friend_id
     FROM friends
     WHERE user1_id = $1 OR user2_id = $1
-  `, [userId]);
+  `, [normUserId]);
 
-  const statusList = friendsRes.rows.map(f => ({
-    userId: f.friend_id,
-    isOnline: onlineUsers.has(f.friend_id) && onlineUsers.get(f.friend_id).size > 0
-  }));
+  const statusList = friendsRes.rows.map(f => {
+    const friendId = Number(f.friend_id);
+    return {
+      userId: friendId,
+      isOnline: onlineUsers.has(friendId) && onlineUsers.get(friendId).size > 0
+    };
+  });
 
   if (statusList.length > 0) {
     socket.emit('initial_friends_status', statusList);

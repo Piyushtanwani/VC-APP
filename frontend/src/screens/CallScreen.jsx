@@ -256,7 +256,12 @@ export default function CallScreen({ call, currentUser, onEndCall }) {
           {callStatus === 'connecting' && `⏳ Connecting...`}
           {callStatus === 'connected' && `🟢 ${call.target.username}`}
           {callStatus === 'calling' && `📞 Initiating call...`}
-          {callStatus === 'error' && `❌ Call failed — check camera/mic permissions`}
+          {callStatus === 'error' && (
+            <div style={{ color: '#ff7675' }}>
+              ❌ Call failed — Permission denied.<br/>
+              Please enable Camera/Mic access in settings.
+            </div>
+          )}
         </h2>
         {callStatus === 'connected' && (
           <div style={{

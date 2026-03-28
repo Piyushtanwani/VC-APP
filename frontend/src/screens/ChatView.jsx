@@ -175,7 +175,6 @@ export default function ChatView({ friend, currentUser, onStartCall, onBack }) {
             className="btn-icon btn-call"
             onClick={() => onStartCall(friend)}
             title="Video Call"
-            disabled={!friend.online_status}
           >
             📹
           </button>

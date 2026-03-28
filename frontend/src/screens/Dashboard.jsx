@@ -197,16 +197,18 @@ export default function Dashboard({ user, setUser, token, onLogout }) {
 
     socket.on('initial_friends_status', (data) => {
       setFriends(prev => prev.map(f => {
-        const status = data.find(s => s.userId === f.id)
+        const friendId = Number(f.id);
+        const status = data.find(s => Number(s.userId) === friendId)
         return status ? { ...f, online_status: status.isOnline ? 1 : 0 } : f
       }))
     })
 
     socket.on('user_status_changed', (data) => {
+      const changedUserId = Number(data.userId);
       setFriends(prev => prev.map(f =>
-        f.id === data.userId ? { ...f, online_status: data.isOnline ? 1 : 0 } : f
+        Number(f.id) === changedUserId ? { ...f, online_status: data.isOnline ? 1 : 0 } : f
       ))
-      if (selectedFriend && selectedFriend.id === data.userId) {
+      if (selectedFriend && Number(selectedFriend.id) === changedUserId) {
         setSelectedFriend(prev => ({ ...prev, online_status: data.isOnline ? 1 : 0 }))
       }
     })
