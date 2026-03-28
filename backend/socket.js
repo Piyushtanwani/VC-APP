@@ -67,23 +67,25 @@ function setupSocket(io) {
     socket.on('send_friend_request', async (data) => {
       const targetId = Number(data.receiverId);
       console.log(`📩 ${username} sending friend request to ID: ${targetId}`);
-      const receiverSockets = onlineUsers.get(targetId);
       
+      // 1. Send via Socket if online
+      const receiverSockets = onlineUsers.get(targetId);
       if (receiverSockets) {
         io.to(Array.from(receiverSockets)).emit('friend_request_received', {
           from: { id: userId, username },
           requestId: data.requestId
         });
-      } else {
-        const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [targetId]);
-        const receiver = userRes.rows[0];
-        if (receiver && receiver.fcm_token) {
-          sendPushNotification(receiver.fcm_token, {
-            title: 'New Friend Request',
-            body: `${username} sent you a friend request!`,
-            data: { type: 'friend_request', senderId: userId.toString() }
-          });
-        }
+      }
+      
+      // 2. ALWAYS try Push Notification (for tray alerts)
+      const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [targetId]);
+      const receiver = userRes.rows[0];
+      if (receiver && receiver.fcm_token) {
+        sendPushNotification(receiver.fcm_token, {
+          title: 'New Friend Request',
+          body: `${username} sent you a friend request!`,
+          data: { type: 'friend_request', senderId: userId.toString() }
+        }, 'chat-messages');
       }
     });
 
@@ -104,7 +106,7 @@ function setupSocket(io) {
             title: 'Friend Request Accepted',
             body: `${username} accepted your friend request!`,
             data: { type: 'friend_request_accepted', fromId: userId.toString() }
-          });
+          }, 'chat-messages');
         }
       }
     });
@@ -140,21 +142,23 @@ function setupSocket(io) {
           created_at: insertRes.rows[0].created_at
         };
 
+        // 1. Send via Socket if online
         const receiverSockets = onlineUsers.get(receiverId);
         if (receiverSockets && receiverSockets.size > 0) {
           receiverSockets.forEach(sId => {
             io.to(sId).emit('receive_message', msgData);
           });
-        } else {
-          const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [receiverId]);
-          const receiver = userRes.rows[0];
-          if (receiver && receiver.fcm_token) {
-            sendPushNotification(receiver.fcm_token, {
-              title: `New message from ${username}`,
-              body: message.length > 50 ? message.substring(0, 47) + '...' : message,
-              data: { type: 'chat_message', senderId: userId.toString() }
-            }, 'chat-messages');
-          }
+        }
+
+        // 2. ALWAYS try Push Notification (for tray alerts)
+        const userRes = await db.query('SELECT fcm_token FROM users WHERE id = $1', [receiverId]);
+        const receiver = userRes.rows[0];
+        if (receiver && receiver.fcm_token) {
+          sendPushNotification(receiver.fcm_token, {
+            title: `New message from ${username}`,
+            body: message.length > 50 ? message.substring(0, 47) + '...' : message,
+            data: { type: 'chat_message', senderId: userId.toString() }
+          }, 'chat-messages');
         }
 
         socket.emit('message_sent', msgData);
