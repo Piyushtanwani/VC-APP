@@ -37,7 +37,7 @@ router.post('/send-otp', async (req, res) => {
 
     // Delete existing OTPs for this email/purpose
     await db.query('DELETE FROM otp_verifications WHERE email = $1 AND purpose = $2', [email, purpose]);
-    
+
     // Save new OTP
     await db.query(
       'INSERT INTO otp_verifications (email, code, purpose, expires_at) VALUES ($1, $2, $3, $4)',
@@ -132,6 +132,7 @@ router.post('/login', async (req, res) => {
     }
 
     const valid = bcrypt.compareSync(password, user.password_hash);
+    console.log(password);
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
